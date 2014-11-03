@@ -62,14 +62,9 @@ start_link(Opts) ->
     Timeout = proplists:get_value(timeout, Opts, 1000 * 60 * 6),
     case proplists:get_value(block, Opts) of
         true ->
-            case gen_server:start_link(?MODULE, [Opts, self()], []) of
+            case gen_server:start_link(?MODULE, [Opts, undefined], []) of
                 {ok, Pid} ->
-                    receive
-                        {Pid, load_complete} ->
-                            {ok, Pid}
-                    after Timeout ->
-                        {error, timeout}
-                    end;
+                    gen_server:call(Pid,wait_for_load,Timeout);
                 Err ->
                     Err
             end;
@@ -87,6 +82,11 @@ init([Opts, CallerPid]) ->
         Error ->
             {stop, Error}
     end.
+handle_call(wait_for_load, _From, State = #state{state = up}) ->
+    {reply,{ok,self()},State};
+
+handle_call(wait_for_load, From, State = #state{state = loading,caller_pid = undefined}) ->
+    {noreply,State#state{caller_pid = From}};
 
 handle_call(_Request, _From, State = #state{}) ->
     {reply, ignore, State, ?HEARTBEAT}.
@@ -104,7 +104,7 @@ handle_info({tcp, Socket, Data}, #state{callback=Callback,
             {eof, Rest} ->
                 case CallerPid of
                     undefined -> ok;
-                    _ -> CallerPid ! {self(), load_complete}
+                    _ -> gen_server:reply(CallerPid,{ok,self()})
                 end,
                 nsync_utils:do_callback(Callback, [{load, eof}]),
                 {ok, Rest1} = redis_text_proto:parse_commands(Rest, Callback),
