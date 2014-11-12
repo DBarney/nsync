@@ -39,11 +39,11 @@
 -record(state, {callback, caller_pid, socket, opts, 
                 state, buffer, rdb_state}).
 
--define(TIMEOUT, 30000).
+-define(TIMEOUT, 15000).
 %% By default, redis should send us a PING message roughly every second
 %% even with data flowing through. If this fails to happen and we receive
 %% no data whatsoever in over a minute, we can assume something went wrong.
--define(HEARTBEAT, 60000). % 1 minute
+-define(HEARTBEAT, 30000). % 1 minute
 
 -define(CALLBACK_MODS, [nsync_string,
                         nsync_list,
